@@ -107,6 +107,37 @@ func TestUserManagementCreateUser(t *testing.T) {
 	require.Equal(t, expectedResponse, userRes)
 }
 
+func TestUserManagementCreateUserPasswordHash(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(createUserTestHandler))
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+
+	SetAPIKey("test")
+
+	expectedResponse := User{
+		ID:            "user_01E3JC5F5Z1YJNPGVYWV9SX6GH",
+		Email:         "marcelina@foo-corp.com",
+		FirstName:     "Marcelina",
+		LastName:      "Davis",
+		EmailVerified: true,
+		CreatedAt:     "2021-06-25T19:07:33.155Z",
+		UpdatedAt:     "2021-06-25T19:07:33.155Z",
+	}
+
+	userRes, err := CreateUser(context.Background(), CreateUserOpts{
+		Email:            "marcelina@gmail.com",
+		FirstName:        "Marcelina",
+		LastName:         "Davis",
+		EmailVerified:    true,
+		PasswordHash:     "$2b$10$dXS6RadWKYIqs6vOwqKZceLuCIqz6S81t06.yOkGJbbfeO9go4fai",
+		PasswordHashType: "bcrypt",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, userRes)
+}
+
 func TestUserManagementUpdateUser(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(updateUserTestHandler))
 	defer server.Close()
@@ -184,6 +215,31 @@ func TestUsersDeleteUser(t *testing.T) {
 	require.Equal(t, nil, err)
 }
 
+func TestUsersGetEmailVerification(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(getEmailVerificationTestHandler))
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+	SetAPIKey("test")
+
+	expectedResponse := EmailVerification{
+		ID:        "email_verification_123",
+		UserId:    "user_123",
+		Email:     "marcelina@foo-corp.com",
+		ExpiresAt: "2021-06-25T19:07:33.155Z",
+		Code:      "123456",
+		CreatedAt: "2021-06-25T19:07:33.155Z",
+		UpdatedAt: "2021-06-25T19:07:33.155Z",
+	}
+
+	getByIDRes, err := GetEmailVerification(context.Background(), GetEmailVerificationOpts{
+		EmailVerification: "email_verification_123",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, getByIDRes)
+}
+
 func TestUsersSendVerificationEmail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(sendVerificationEmailTestHandler))
 	defer server.Close()
@@ -237,6 +293,58 @@ func TestUserManagementVerifyEmail(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, expectedResponse, userRes)
+}
+
+func TestUsersGetPasswordReset(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(getPasswordResetTestHandler))
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+	SetAPIKey("test")
+
+	expectedResponse := PasswordReset{
+		ID:                 "password_reset_123",
+		UserId:             "user_123",
+		Email:              "marcelina@foo-corp.com",
+		PasswordResetToken: "myToken",
+		PasswordResetUrl:   "https://your-app.com/reset-password?token=myToken",
+		ExpiresAt:          "2021-06-25T19:07:33.155Z",
+		CreatedAt:          "2021-06-25T19:07:33.155Z",
+	}
+
+	getByIDRes, err := GetPasswordReset(context.Background(), GetPasswordResetOpts{
+		PasswordReset: "password_reset_123",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, getByIDRes)
+}
+
+func TestUserManagementCreatePasswordReset(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(CreatePasswordResetTestHandler))
+
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+
+	SetAPIKey("test")
+
+	expectedResponse := PasswordReset{
+		ID:                 "password_reset_123",
+		UserId:             "user_123",
+		Email:              "marcelina@foo-corp.com",
+		PasswordResetToken: "myToken",
+		PasswordResetUrl:   "https://your-app.com/reset-password?token=myToken",
+		ExpiresAt:          "2021-06-25T19:07:33.155Z",
+		CreatedAt:          "2021-06-25T19:07:33.155Z",
+	}
+
+	createRes, err := CreatePasswordReset(context.Background(), CreatePasswordResetOpts{
+		Email: "marcelina@foo-corp.com",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, createRes)
 }
 
 func TestUserManagementCreatePasswordResetChallenge(t *testing.T) {
@@ -461,6 +569,58 @@ func TestUserManagementAuthenticateWithOrganizationSelection(t *testing.T) {
 	require.Equal(t, expectedResponse, authenticationRes)
 }
 
+func TestUsersGetMagicAuth(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(getMagicAuthTestHandler))
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+	SetAPIKey("test")
+
+	expectedResponse := MagicAuth{
+		ID:        "magic_auth_123",
+		UserId:    "user_123",
+		Email:     "marcelina@foo-corp.com",
+		ExpiresAt: "2021-06-25T19:07:33.155Z",
+		Code:      "123456",
+		CreatedAt: "2021-06-25T19:07:33.155Z",
+		UpdatedAt: "2021-06-25T19:07:33.155Z",
+	}
+
+	getByIDRes, err := GetMagicAuth(context.Background(), GetMagicAuthOpts{
+		MagicAuth: "magic_auth_123",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, getByIDRes)
+}
+
+func TestUserManagementCreateMagicAuth(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(CreateMagicAuthTestHandler))
+
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+
+	SetAPIKey("test")
+
+	expectedResponse := MagicAuth{
+		ID:        "magic_auth_123",
+		UserId:    "user_123",
+		Email:     "marcelina@foo-corp.com",
+		ExpiresAt: "2021-06-25T19:07:33.155Z",
+		Code:      "123456",
+		CreatedAt: "2021-06-25T19:07:33.155Z",
+		UpdatedAt: "2021-06-25T19:07:33.155Z",
+	}
+
+	createRes, err := CreateMagicAuth(context.Background(), CreateMagicAuthOpts{
+		Email: "marcelina@foo-corp.com",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, createRes)
+}
+
 func TestUserManagementSendMagicAuthCode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(sendMagicAuthCodeTestHandler))
 
@@ -501,8 +661,9 @@ func TestUserManagementEnrollAuthFactor(t *testing.T) {
 	}
 
 	authenticationRes, err := EnrollAuthFactor(context.Background(), EnrollAuthFactorOpts{
-		User: "user_01E3JC5F5Z1YJNPGVYWV9SX6GH",
-		Type: mfa.TOTP,
+		User:       "user_01E3JC5F5Z1YJNPGVYWV9SX6GH",
+		Type:       mfa.TOTP,
+		TOTPSecret: "testSecret",
 	})
 
 	require.NoError(t, err)
@@ -607,7 +768,7 @@ func TestUserManagementCreateOrganizationMembership(t *testing.T) {
 
 	SetAPIKey("test")
 
-	expectedRole := RoleResponse{
+	expectedRole := common.RoleResponse{
 		Slug: "member",
 	}
 
@@ -654,7 +815,7 @@ func TestUsersUpdateOrganizationMembership(t *testing.T) {
 
 	SetAPIKey("test")
 
-	expectedRole := RoleResponse{
+	expectedRole := common.RoleResponse{
 		Slug: "member",
 	}
 
@@ -680,6 +841,56 @@ func TestUsersUpdateOrganizationMembership(t *testing.T) {
 	require.Equal(t, expectedResponse, body)
 }
 
+func TestUserManagementDeactivateOrganizationMembership(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(deactivateOrganizationMembershipTestHandler))
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+
+	SetAPIKey("test")
+
+	expectedResponse := OrganizationMembership{
+		ID:             "om_01E4ZCR3C56J083X43JQXF3JK5",
+		UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
+		OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
+		Status:         Inactive,
+		CreatedAt:      "2021-06-25T19:07:33.155Z",
+		UpdatedAt:      "2021-06-25T19:07:33.155Z",
+	}
+
+	userRes, err := DeactivateOrganizationMembership(context.Background(), DeactivateOrganizationMembershipOpts{
+		OrganizationMembership: "om_01E4ZCR3C56J083X43JQXF3JK5",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, userRes)
+}
+
+func TestUserManagementReactivateOrganizationMembership(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(reactivateOrganizationMembershipTestHandler))
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+
+	SetAPIKey("test")
+
+	expectedResponse := OrganizationMembership{
+		ID:             "om_01E4ZCR3C56J083X43JQXF3JK5",
+		UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
+		OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
+		Status:         Active,
+		CreatedAt:      "2021-06-25T19:07:33.155Z",
+		UpdatedAt:      "2021-06-25T19:07:33.155Z",
+	}
+
+	userRes, err := ReactivateOrganizationMembership(context.Background(), ReactivateOrganizationMembershipOpts{
+		OrganizationMembership: "om_01E4ZCR3C56J083X43JQXF3JK5",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, userRes)
+}
+
 func TestUsersGetInvitation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(getInvitationTestHandler))
 	defer server.Close()
@@ -688,17 +899,44 @@ func TestUsersGetInvitation(t *testing.T) {
 	SetAPIKey("test")
 
 	expectedResponse := Invitation{
-		ID:        "invitation_123",
-		Email:     "marcelina@foo-corp.com",
-		State:     Pending,
-		Token:     "myToken",
-		ExpiresAt: "2021-06-25T19:07:33.155Z",
-		CreatedAt: "2021-06-25T19:07:33.155Z",
-		UpdatedAt: "2021-06-25T19:07:33.155Z",
+		ID:                  "invitation_123",
+		Email:               "marcelina@foo-corp.com",
+		State:               Pending,
+		Token:               "myToken",
+		AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+		ExpiresAt:           "2021-06-25T19:07:33.155Z",
+		CreatedAt:           "2021-06-25T19:07:33.155Z",
+		UpdatedAt:           "2021-06-25T19:07:33.155Z",
 	}
 
 	getByIDRes, err := GetInvitation(context.Background(), GetInvitationOpts{
 		Invitation: "invitation_123",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, expectedResponse, getByIDRes)
+}
+
+func TestUsersFindInvitationByToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(findInvitationByTokenTestHandler))
+	defer server.Close()
+
+	DefaultClient = mockClient(server)
+	SetAPIKey("test")
+
+	expectedResponse := Invitation{
+		ID:                  "invitation_123",
+		Email:               "marcelina@foo-corp.com",
+		State:               Pending,
+		Token:               "myToken",
+		AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+		ExpiresAt:           "2021-06-25T19:07:33.155Z",
+		CreatedAt:           "2021-06-25T19:07:33.155Z",
+		UpdatedAt:           "2021-06-25T19:07:33.155Z",
+	}
+
+	getByIDRes, err := FindInvitationByToken(context.Background(), FindInvitationByTokenOpts{
+		InvitationToken: "myToken",
 	})
 
 	require.NoError(t, err)
@@ -716,13 +954,14 @@ func TestUsersListInvitations(t *testing.T) {
 		ListInvitationsResponse{
 			Data: []Invitation{
 				{
-					ID:        "invitation_123",
-					Email:     "marcelina@foo-corp.com",
-					State:     Pending,
-					Token:     "myToken",
-					ExpiresAt: "2021-06-25T19:07:33.155Z",
-					CreatedAt: "2021-06-25T19:07:33.155Z",
-					UpdatedAt: "2021-06-25T19:07:33.155Z",
+					ID:                  "invitation_123",
+					Email:               "marcelina@foo-corp.com",
+					State:               Pending,
+					Token:               "myToken",
+					AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+					ExpiresAt:           "2021-06-25T19:07:33.155Z",
+					CreatedAt:           "2021-06-25T19:07:33.155Z",
+					UpdatedAt:           "2021-06-25T19:07:33.155Z",
 				},
 			},
 			ListMetadata: common.ListMetadata{
@@ -748,13 +987,14 @@ func TestUsersSendInvitation(t *testing.T) {
 	SetAPIKey("test")
 
 	expectedResponse := Invitation{
-		ID:        "invitation_123",
-		Email:     "marcelina@foo-corp.com",
-		State:     Pending,
-		Token:     "myToken",
-		ExpiresAt: "2021-06-25T19:07:33.155Z",
-		CreatedAt: "2021-06-25T19:07:33.155Z",
-		UpdatedAt: "2021-06-25T19:07:33.155Z",
+		ID:                  "invitation_123",
+		Email:               "marcelina@foo-corp.com",
+		State:               Pending,
+		Token:               "myToken",
+		AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+		ExpiresAt:           "2021-06-25T19:07:33.155Z",
+		CreatedAt:           "2021-06-25T19:07:33.155Z",
+		UpdatedAt:           "2021-06-25T19:07:33.155Z",
 	}
 
 	createRes, err := SendInvitation(context.Background(), SendInvitationOpts{
@@ -762,6 +1002,7 @@ func TestUsersSendInvitation(t *testing.T) {
 		OrganizationID: "org_123",
 		ExpiresInDays:  7,
 		InviterUserID:  "user_123",
+		RoleSlug:       "admin",
 	})
 
 	require.NoError(t, err)
@@ -778,13 +1019,14 @@ func TestUsersRevokeInvitation(t *testing.T) {
 	SetAPIKey("test")
 
 	expectedResponse := Invitation{
-		ID:        "invitation_123",
-		Email:     "marcelina@foo-corp.com",
-		State:     Pending,
-		Token:     "myToken",
-		ExpiresAt: "2021-06-25T19:07:33.155Z",
-		CreatedAt: "2021-06-25T19:07:33.155Z",
-		UpdatedAt: "2021-06-25T19:07:33.155Z",
+		ID:                  "invitation_123",
+		Email:               "marcelina@foo-corp.com",
+		State:               Pending,
+		Token:               "myToken",
+		AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+		ExpiresAt:           "2021-06-25T19:07:33.155Z",
+		CreatedAt:           "2021-06-25T19:07:33.155Z",
+		UpdatedAt:           "2021-06-25T19:07:33.155Z",
 	}
 
 	revokeRes, err := RevokeInvitation(context.Background(), RevokeInvitationOpts{

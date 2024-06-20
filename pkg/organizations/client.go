@@ -79,6 +79,8 @@ type Organization struct {
 
 	// Whether Connections within the Organization allow profiles that are
 	// outside of the Organization's configured User Email Domains.
+	//
+	// Deprecated: If you need to allow sign-ins from any email domain, contact support@workos.com.
 	AllowProfilesOutsideOrganization bool `json:"allow_profiles_outside_organization"`
 
 	// The Organization's Domains.
@@ -125,6 +127,22 @@ type ListOrganizationsResponse struct {
 	ListMetadata common.ListMetadata `json:"listMetadata"`
 }
 
+type OrganizationDomainDataState string
+
+const (
+	Verified OrganizationDomainDataState = "verified"
+	Pending  OrganizationDomainDataState = "pending"
+)
+
+// OrganizationDomainData contains data used to create an OrganizationDomain.
+type OrganizationDomainData struct {
+	// The domain's value.
+	Domain string `json:"domain"`
+
+	// The domain's state.
+	State OrganizationDomainDataState `json:"state"`
+}
+
 // CreateOrganizationOpts contains the options to create an Organization.
 type CreateOrganizationOpts struct {
 	// Name of the Organization.
@@ -132,10 +150,17 @@ type CreateOrganizationOpts struct {
 
 	// Whether Connections within the Organization allow profiles that are
 	// outside of the Organization's configured User Email Domains.
+	//
+	// Deprecated: If you need to allow sign-ins from any email domain, contact support@workos.com.
 	AllowProfilesOutsideOrganization bool `json:"allow_profiles_outside_organization"`
 
 	// Domains of the Organization.
+	//
+	// Deprecated:  Use DomainData instead.
 	Domains []string `json:"domains"`
+
+	// Domains of the Organization.
+	DomainData []OrganizationDomainData `json:"domain_data"`
 
 	// Optional unique identifier to ensure idempotency
 	IdempotencyKey string `json:"idempotency_iey,omitempty"`
@@ -151,10 +176,17 @@ type UpdateOrganizationOpts struct {
 
 	// Whether Connections within the Organization allow profiles that are
 	// outside of the Organization's configured User Email Domains.
+	//
+	// Deprecated: If you need to allow sign-ins from any email domain, contact support@workos.com.
 	AllowProfilesOutsideOrganization bool
 
 	// Domains of the Organization.
+	//
+	// Deprecated:  Use DomainData instead.
 	Domains []string
+
+	// Domains of the Organization.
+	DomainData []OrganizationDomainData `json:"domain_data"`
 }
 
 // GetOrganization gets an Organization.
@@ -302,10 +334,15 @@ func (c *Client) UpdateOrganization(ctx context.Context, opts UpdateOrganization
 		AllowProfilesOutsideOrganization bool `json:"allow_profiles_outside_organization"`
 
 		// Domains of the Organization.
-		Domains []string `json:"domains"`
+		DomainData []OrganizationDomainData `json:"domain_data,omitempty"`
+
+		// Domains of the Organization.
+		//
+		// Deprecated:  Use DomainData instead.
+		Domains []string `json:"domains,omitempty"`
 	}
 
-	update_opts := UpdateOrganizationChangeOpts{opts.Name, opts.AllowProfilesOutsideOrganization, opts.Domains}
+	update_opts := UpdateOrganizationChangeOpts{opts.Name, opts.AllowProfilesOutsideOrganization, opts.DomainData, opts.Domains}
 
 	data, err := c.JSONEncode(update_opts)
 	if err != nil {

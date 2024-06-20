@@ -509,6 +509,92 @@ func deleteUserTestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
+func TestListIdentities(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  ListIdentitiesOpts
+		expected ListIdentitiesResult
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns identities",
+			client:   NewClient("test"),
+			options: ListIdentitiesOpts{
+				ID: "user_01E3JC5F5Z1YJNPGVYWV9SX6GH",
+			},
+			expected: ListIdentitiesResult{
+				Identities: []Identity{
+					{
+						IdpID:    "13966412",
+						Type:     "OAuth",
+						Provider: "GitHubOAuth",
+					},
+				},
+			},
+			err: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(listIdentitiesTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			identities, err := client.ListIdentities(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, identities)
+		})
+	}
+}
+
+func listIdentitiesTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "bad method", http.StatusBadRequest)
+	}
+
+	if userAgent := r.Header.Get("User-Agent"); !strings.Contains(userAgent, "workos-go/") {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	body, err := json.Marshal(ListIdentitiesResult{
+		Identities: []Identity{
+			{
+				IdpID:    "13966412",
+				Type:     "OAuth",
+				Provider: "GitHubOAuth",
+			},
+		},
+	})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
 func TestClientAuthorizeURL(t *testing.T) {
 	tests := []struct {
 		scenario string
@@ -543,7 +629,7 @@ func TestClientAuthorizeURL(t *testing.T) {
 				RedirectURI:  "https://example.com/sso/workos/callback",
 				State:        "custom state",
 			},
-			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&connection=connection_123&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
+			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&connection_id=connection_123&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
 		},
 		{
 			scenario: "generate url with state",
@@ -564,7 +650,7 @@ func TestClientAuthorizeURL(t *testing.T) {
 				RedirectURI:  "https://example.com/sso/workos/callback",
 				State:        "custom state",
 			},
-			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&connection=connection_123&provider=GoogleOAuth&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
+			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&connection_id=connection_123&provider=GoogleOAuth&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
 		},
 		{
 			scenario: "generate url with organization",
@@ -574,7 +660,7 @@ func TestClientAuthorizeURL(t *testing.T) {
 				RedirectURI:    "https://example.com/sso/workos/callback",
 				State:          "custom state",
 			},
-			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&organization=organization_123&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
+			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&organization_id=organization_123&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
 		},
 		{
 			scenario: "generate url with DomainHint",
@@ -585,7 +671,7 @@ func TestClientAuthorizeURL(t *testing.T) {
 				State:        "custom state",
 				DomainHint:   "foo.com",
 			},
-			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&connection=connection_123&domain_hint=foo.com&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
+			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&connection_id=connection_123&domain_hint=foo.com&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
 		},
 		{
 			scenario: "generate url with LoginHint",
@@ -596,7 +682,7 @@ func TestClientAuthorizeURL(t *testing.T) {
 				State:        "custom state",
 				LoginHint:    "foo@workos.com",
 			},
-			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&connection=connection_123&login_hint=foo%40workos.com&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
+			expected: "https://api.workos.com/user_management/authorize?client_id=client_123&connection_id=connection_123&login_hint=foo%40workos.com&redirect_uri=https%3A%2F%2Fexample.com%2Fsso%2Fworkos%2Fcallback&response_type=code&state=custom+state",
 		},
 	}
 
@@ -1105,6 +1191,87 @@ func refreshAuthenticationResponseTestHandler(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusUnauthorized)
 }
 
+func TestGetEmailVerification(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  GetEmailVerificationOpts
+		expected EmailVerification
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns EmailVerification by ID",
+			client:   NewClient("test"),
+			options:  GetEmailVerificationOpts{EmailVerification: "email_verification_123"},
+			expected: EmailVerification{
+				ID:        "email_verification_123",
+				UserId:    "user_123",
+				Email:     "marcelina@foo-corp.com",
+				ExpiresAt: "2021-06-25T19:07:33.155Z",
+				Code:      "123456",
+				CreatedAt: "2021-06-25T19:07:33.155Z",
+				UpdatedAt: "2021-06-25T19:07:33.155Z",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(getEmailVerificationTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			emailVerification, err := client.GetEmailVerification(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, emailVerification)
+		})
+	}
+}
+
+func getEmailVerificationTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	var body []byte
+	var err error
+
+	if r.URL.Path == "/user_management/email_verification/email_verification_123" {
+		emailVerification := EmailVerification{
+			ID:        "email_verification_123",
+			UserId:    "user_123",
+			Email:     "marcelina@foo-corp.com",
+			ExpiresAt: "2021-06-25T19:07:33.155Z",
+			Code:      "123456",
+			CreatedAt: "2021-06-25T19:07:33.155Z",
+			UpdatedAt: "2021-06-25T19:07:33.155Z",
+		}
+		body, err = json.Marshal(emailVerification)
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
 func TestSendVerificationEmail(t *testing.T) {
 	tests := []struct {
 		scenario string
@@ -1275,6 +1442,170 @@ func verifyEmailCodeTestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
+func TestGetPasswordReset(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  GetPasswordResetOpts
+		expected PasswordReset
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns PasswordReset by ID",
+			client:   NewClient("test"),
+			options:  GetPasswordResetOpts{PasswordReset: "password_reset_123"},
+			expected: PasswordReset{
+				ID:                 "password_reset_123",
+				UserId:             "user_123",
+				Email:              "marcelina@foo-corp.com",
+				PasswordResetToken: "myToken",
+				PasswordResetUrl:   "https://your-app.com/reset-password?token=myToken",
+				ExpiresAt:          "2021-06-25T19:07:33.155Z",
+				CreatedAt:          "2021-06-25T19:07:33.155Z",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(getPasswordResetTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			passwordReset, err := client.GetPasswordReset(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, passwordReset)
+		})
+	}
+}
+
+func getPasswordResetTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	var body []byte
+	var err error
+
+	if r.URL.Path == "/user_management/password_reset/password_reset_123" {
+		passwordReset := PasswordReset{
+			ID:                 "password_reset_123",
+			UserId:             "user_123",
+			Email:              "marcelina@foo-corp.com",
+			PasswordResetToken: "myToken",
+			PasswordResetUrl:   "https://your-app.com/reset-password?token=myToken",
+			ExpiresAt:          "2021-06-25T19:07:33.155Z",
+			CreatedAt:          "2021-06-25T19:07:33.155Z",
+		}
+		body, err = json.Marshal(passwordReset)
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
+func TestCreatePasswordReset(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  CreatePasswordResetOpts
+		expected PasswordReset
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns Password Reset",
+			client:   NewClient("test"),
+			options: CreatePasswordResetOpts{
+				Email: "marcelina@foo-corp.com",
+			},
+			expected: PasswordReset{
+				ID:                 "password_reset_123",
+				UserId:             "user_123",
+				Email:              "marcelina@foo-corp.com",
+				PasswordResetToken: "myToken",
+				PasswordResetUrl:   "https://your-app.com/reset-password?token=myToken",
+				ExpiresAt:          "2021-06-25T19:07:33.155Z",
+				CreatedAt:          "2021-06-25T19:07:33.155Z",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(CreatePasswordResetTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			passwordReset, err := client.CreatePasswordReset(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, passwordReset)
+		})
+	}
+}
+
+func CreatePasswordResetTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	var body []byte
+	var err error
+
+	if r.URL.Path == "/user_management/password_reset" {
+		body, err = json.Marshal(
+			PasswordReset{
+				ID:                 "password_reset_123",
+				UserId:             "user_123",
+				Email:              "marcelina@foo-corp.com",
+				PasswordResetToken: "myToken",
+				PasswordResetUrl:   "https://your-app.com/reset-password?token=myToken",
+				ExpiresAt:          "2021-06-25T19:07:33.155Z",
+				CreatedAt:          "2021-06-25T19:07:33.155Z",
+			})
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
 func TestSendPasswordResetEmail(t *testing.T) {
 	tests := []struct {
 		scenario string
@@ -1399,6 +1730,170 @@ func resetPasswordHandler(w http.ResponseWriter, r *http.Request) {
 				EmailVerified: true,
 			},
 		})
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
+func TestGetMagicAuth(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  GetMagicAuthOpts
+		expected MagicAuth
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns MagicAuth by ID",
+			client:   NewClient("test"),
+			options:  GetMagicAuthOpts{MagicAuth: "magic_auth_123"},
+			expected: MagicAuth{
+				ID:        "magic_auth_123",
+				UserId:    "user_123",
+				Email:     "marcelina@foo-corp.com",
+				ExpiresAt: "2021-06-25T19:07:33.155Z",
+				Code:      "123456",
+				CreatedAt: "2021-06-25T19:07:33.155Z",
+				UpdatedAt: "2021-06-25T19:07:33.155Z",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(getMagicAuthTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			magicAuth, err := client.GetMagicAuth(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, magicAuth)
+		})
+	}
+}
+
+func getMagicAuthTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	var body []byte
+	var err error
+
+	if r.URL.Path == "/user_management/magic_auth/magic_auth_123" {
+		magicAuth := MagicAuth{
+			ID:        "magic_auth_123",
+			UserId:    "user_123",
+			Email:     "marcelina@foo-corp.com",
+			ExpiresAt: "2021-06-25T19:07:33.155Z",
+			Code:      "123456",
+			CreatedAt: "2021-06-25T19:07:33.155Z",
+			UpdatedAt: "2021-06-25T19:07:33.155Z",
+		}
+		body, err = json.Marshal(magicAuth)
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
+func TestCreateMagicAuth(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  CreateMagicAuthOpts
+		expected MagicAuth
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns MagicAuth",
+			client:   NewClient("test"),
+			options: CreateMagicAuthOpts{
+				Email: "marcelina@foo-corp.com",
+			},
+			expected: MagicAuth{
+				ID:        "magic_auth_123",
+				UserId:    "user_123",
+				Email:     "marcelina@foo-corp.com",
+				ExpiresAt: "2021-06-25T19:07:33.155Z",
+				Code:      "123456",
+				CreatedAt: "2021-06-25T19:07:33.155Z",
+				UpdatedAt: "2021-06-25T19:07:33.155Z",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(CreateMagicAuthTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			magicAuth, err := client.CreateMagicAuth(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, magicAuth)
+		})
+	}
+}
+
+func CreateMagicAuthTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	var body []byte
+	var err error
+
+	if r.URL.Path == "/user_management/magic_auth" {
+		body, err = json.Marshal(
+			MagicAuth{
+				ID:        "magic_auth_123",
+				UserId:    "user_123",
+				Email:     "marcelina@foo-corp.com",
+				ExpiresAt: "2021-06-25T19:07:33.155Z",
+				Code:      "123456",
+				CreatedAt: "2021-06-25T19:07:33.155Z",
+				UpdatedAt: "2021-06-25T19:07:33.155Z",
+			})
 	}
 
 	if err != nil {
@@ -1798,6 +2293,40 @@ func TestListOrganizationMemberships(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expectedResponse, organizationMemberships)
 	})
+
+	t.Run("ListOrganizationMemberships succeeds to fetch OrganizationMemberships belonging to a User with particular statuses", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(listOrganizationMembershipsTestHandler))
+		defer server.Close()
+		client := &Client{
+			HTTPClient: server.Client(),
+			Endpoint:   server.URL,
+			APIKey:     "test",
+		}
+
+		expectedResponse := ListOrganizationMembershipsResponse{
+			Data: []OrganizationMembership{
+				{
+					ID:             "om_01E4ZCR3C56J083X43JQXF3JK5",
+					UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
+					OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
+					Status:         Active,
+					CreatedAt:      "2021-06-25T19:07:33.155Z",
+					UpdatedAt:      "2021-06-25T19:07:33.155Z",
+				},
+			},
+			ListMetadata: common.ListMetadata{
+				After: "",
+			},
+		}
+
+		organizationMemberships, err := client.ListOrganizationMemberships(
+			context.Background(),
+			ListOrganizationMembershipsOpts{Statuses: []OrganizationMembershipStatus{Active, Inactive}, UserID: "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E"},
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, expectedResponse, organizationMemberships)
+	})
 }
 
 func listOrganizationMembershipsTestHandler(w http.ResponseWriter, r *http.Request) {
@@ -1870,7 +2399,7 @@ func TestCreateOrganizationMembership(t *testing.T) {
 				UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
 				OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
 				Status:         Active,
-				Role: RoleResponse{
+				Role: common.RoleResponse{
 					Slug: "member",
 				},
 				CreatedAt: "2021-06-25T19:07:33.155Z",
@@ -1915,7 +2444,7 @@ func createOrganizationMembershipTestHandler(w http.ResponseWriter, r *http.Requ
 			UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
 			OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
 			Status:         Active,
-			Role: RoleResponse{
+			Role: common.RoleResponse{
 				Slug: "member",
 			},
 			CreatedAt: "2021-06-25T19:07:33.155Z",
@@ -1958,7 +2487,7 @@ func TestUpdateOrganizationMembership(t *testing.T) {
 				UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
 				OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
 				Status:         Active,
-				Role: RoleResponse{
+				Role: common.RoleResponse{
 					Slug: "member",
 				},
 				CreatedAt: "2021-06-25T19:07:33.155Z",
@@ -2003,7 +2532,7 @@ func updateOrganizationMembershipTestHandler(w http.ResponseWriter, r *http.Requ
 			UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
 			OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
 			Status:         Active,
-			Role: RoleResponse{
+			Role: common.RoleResponse{
 				Slug: "member",
 			},
 			CreatedAt: "2021-06-25T19:07:33.155Z",
@@ -2086,6 +2615,166 @@ func deleteOrganizationMembershipTestHandler(w http.ResponseWriter, r *http.Requ
 	w.Write(body)
 }
 
+func TestDeactivateOrganizationMembership(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  DeactivateOrganizationMembershipOpts
+		expected OrganizationMembership
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns an Organization Membership",
+			client:   NewClient("test"),
+			options: DeactivateOrganizationMembershipOpts{
+				OrganizationMembership: "om_01E4ZCR3C56J083X43JQXF3JK5",
+			},
+			expected: OrganizationMembership{
+				ID:             "om_01E4ZCR3C56J083X43JQXF3JK5",
+				UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
+				OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
+				Status:         Inactive,
+				CreatedAt:      "2021-06-25T19:07:33.155Z",
+				UpdatedAt:      "2021-06-25T19:07:33.155Z",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(deactivateOrganizationMembershipTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			organizationMembership, err := client.DeactivateOrganizationMembership(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, organizationMembership)
+		})
+	}
+}
+
+func deactivateOrganizationMembershipTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	var body []byte
+	var err error
+
+	if r.URL.Path == "/user_management/organization_memberships/om_01E4ZCR3C56J083X43JQXF3JK5/deactivate" {
+		body, err = json.Marshal(OrganizationMembership{
+			ID:             "om_01E4ZCR3C56J083X43JQXF3JK5",
+			UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
+			OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
+			Status:         Inactive,
+			CreatedAt:      "2021-06-25T19:07:33.155Z",
+			UpdatedAt:      "2021-06-25T19:07:33.155Z",
+		})
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
+func TestReactivateOrganizationMembership(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  ReactivateOrganizationMembershipOpts
+		expected OrganizationMembership
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns an Organization Membership",
+			client:   NewClient("test"),
+			options: ReactivateOrganizationMembershipOpts{
+				OrganizationMembership: "om_01E4ZCR3C56J083X43JQXF3JK5",
+			},
+			expected: OrganizationMembership{
+				ID:             "om_01E4ZCR3C56J083X43JQXF3JK5",
+				UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
+				OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
+				Status:         Active,
+				CreatedAt:      "2021-06-25T19:07:33.155Z",
+				UpdatedAt:      "2021-06-25T19:07:33.155Z",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(reactivateOrganizationMembershipTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			organizationMembership, err := client.ReactivateOrganizationMembership(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, organizationMembership)
+		})
+	}
+}
+
+func reactivateOrganizationMembershipTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	var body []byte
+	var err error
+
+	if r.URL.Path == "/user_management/organization_memberships/om_01E4ZCR3C56J083X43JQXF3JK5/reactivate" {
+		body, err = json.Marshal(OrganizationMembership{
+			ID:             "om_01E4ZCR3C56J083X43JQXF3JK5",
+			UserID:         "user_01E4ZCR3C5A4QZ2Z2JQXGKZJ9E",
+			OrganizationID: "org_01E4ZCR3C56J083X43JQXF3JK5",
+			Status:         Active,
+			CreatedAt:      "2021-06-25T19:07:33.155Z",
+			UpdatedAt:      "2021-06-25T19:07:33.155Z",
+		})
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
 func TestGetInvitation(t *testing.T) {
 	tests := []struct {
 		scenario string
@@ -2104,13 +2793,14 @@ func TestGetInvitation(t *testing.T) {
 			client:   NewClient("test"),
 			options:  GetInvitationOpts{Invitation: "invitation_123"},
 			expected: Invitation{
-				ID:        "invitation_123",
-				Email:     "marcelina@foo-corp.com",
-				State:     Pending,
-				Token:     "myToken",
-				ExpiresAt: "2021-06-25T19:07:33.155Z",
-				CreatedAt: "2021-06-25T19:07:33.155Z",
-				UpdatedAt: "2021-06-25T19:07:33.155Z",
+				ID:                  "invitation_123",
+				Email:               "marcelina@foo-corp.com",
+				State:               Pending,
+				Token:               "myToken",
+				AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+				ExpiresAt:           "2021-06-25T19:07:33.155Z",
+				CreatedAt:           "2021-06-25T19:07:33.155Z",
+				UpdatedAt:           "2021-06-25T19:07:33.155Z",
 			},
 		},
 	}
@@ -2147,15 +2837,99 @@ func getInvitationTestHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path == "/user_management/invitations/invitation_123" {
 		invitations := Invitation{
-			ID:        "invitation_123",
-			Email:     "marcelina@foo-corp.com",
-			State:     Pending,
-			Token:     "myToken",
-			ExpiresAt: "2021-06-25T19:07:33.155Z",
-			CreatedAt: "2021-06-25T19:07:33.155Z",
-			UpdatedAt: "2021-06-25T19:07:33.155Z",
+			ID:                  "invitation_123",
+			Email:               "marcelina@foo-corp.com",
+			State:               Pending,
+			Token:               "myToken",
+			AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+			ExpiresAt:           "2021-06-25T19:07:33.155Z",
+			CreatedAt:           "2021-06-25T19:07:33.155Z",
+			UpdatedAt:           "2021-06-25T19:07:33.155Z",
 		}
 		body, err = json.Marshal(invitations)
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
+func TestFindInvitationByToken(t *testing.T) {
+	tests := []struct {
+		scenario string
+		client   *Client
+		options  FindInvitationByTokenOpts
+		expected Invitation
+		err      bool
+	}{
+		{
+			scenario: "Request without API Key returns an error",
+			client:   NewClient(""),
+			err:      true,
+		},
+		{
+			scenario: "Request returns Invitation by token",
+			client:   NewClient("test"),
+			options:  FindInvitationByTokenOpts{InvitationToken: "myToken"},
+			expected: Invitation{
+				ID:                  "invitation_123",
+				Email:               "marcelina@foo-corp.com",
+				State:               Pending,
+				Token:               "myToken",
+				AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+				ExpiresAt:           "2021-06-25T19:07:33.155Z",
+				CreatedAt:           "2021-06-25T19:07:33.155Z",
+				UpdatedAt:           "2021-06-25T19:07:33.155Z",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.scenario, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(findInvitationByTokenTestHandler))
+			defer server.Close()
+
+			client := test.client
+			client.Endpoint = server.URL
+			client.HTTPClient = server.Client()
+
+			invitation, err := client.FindInvitationByToken(context.Background(), test.options)
+			if test.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.expected, invitation)
+		})
+	}
+}
+
+func findInvitationByTokenTestHandler(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer test" {
+		http.Error(w, "bad auth", http.StatusUnauthorized)
+		return
+	}
+
+	var body []byte
+	var err error
+
+	if r.URL.Path == "/user_management/invitations/by_token/myToken" {
+		invitation := Invitation{
+			ID:                  "invitation_123",
+			Email:               "marcelina@foo-corp.com",
+			State:               Pending,
+			Token:               "myToken",
+			AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+			ExpiresAt:           "2021-06-25T19:07:33.155Z",
+			CreatedAt:           "2021-06-25T19:07:33.155Z",
+			UpdatedAt:           "2021-06-25T19:07:33.155Z",
+		}
+		body, err = json.Marshal(invitation)
 	}
 
 	if err != nil {
@@ -2189,13 +2963,14 @@ func TestListInvitations(t *testing.T) {
 			expected: ListInvitationsResponse{
 				Data: []Invitation{
 					{
-						ID:        "invitation_123",
-						Email:     "marcelina@foo-corp.com",
-						State:     Pending,
-						Token:     "myToken",
-						ExpiresAt: "2021-06-25T19:07:33.155Z",
-						CreatedAt: "2021-06-25T19:07:33.155Z",
-						UpdatedAt: "2021-06-25T19:07:33.155Z",
+						ID:                  "invitation_123",
+						Email:               "marcelina@foo-corp.com",
+						State:               Pending,
+						Token:               "myToken",
+						AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+						ExpiresAt:           "2021-06-25T19:07:33.155Z",
+						CreatedAt:           "2021-06-25T19:07:33.155Z",
+						UpdatedAt:           "2021-06-25T19:07:33.155Z",
 					},
 				},
 				ListMetadata: common.ListMetadata{
@@ -2239,13 +3014,14 @@ func listInvitationsTestHandler(w http.ResponseWriter, r *http.Request) {
 		invitations := ListInvitationsResponse{
 			Data: []Invitation{
 				{
-					ID:        "invitation_123",
-					Email:     "marcelina@foo-corp.com",
-					State:     Pending,
-					Token:     "myToken",
-					ExpiresAt: "2021-06-25T19:07:33.155Z",
-					CreatedAt: "2021-06-25T19:07:33.155Z",
-					UpdatedAt: "2021-06-25T19:07:33.155Z",
+					ID:                  "invitation_123",
+					Email:               "marcelina@foo-corp.com",
+					State:               Pending,
+					Token:               "myToken",
+					AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+					ExpiresAt:           "2021-06-25T19:07:33.155Z",
+					CreatedAt:           "2021-06-25T19:07:33.155Z",
+					UpdatedAt:           "2021-06-25T19:07:33.155Z",
 				},
 			},
 			ListMetadata: common.ListMetadata{
@@ -2285,15 +3061,17 @@ func TestSendInvitation(t *testing.T) {
 				OrganizationID: "org_123",
 				ExpiresInDays:  7,
 				InviterUserID:  "user_123",
+				RoleSlug:       "admin",
 			},
 			expected: Invitation{
-				ID:        "invitation_123",
-				Email:     "marcelina@foo-corp.com",
-				State:     Pending,
-				Token:     "myToken",
-				ExpiresAt: "2021-06-25T19:07:33.155Z",
-				CreatedAt: "2021-06-25T19:07:33.155Z",
-				UpdatedAt: "2021-06-25T19:07:33.155Z",
+				ID:                  "invitation_123",
+				Email:               "marcelina@foo-corp.com",
+				State:               Pending,
+				Token:               "myToken",
+				AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+				ExpiresAt:           "2021-06-25T19:07:33.155Z",
+				CreatedAt:           "2021-06-25T19:07:33.155Z",
+				UpdatedAt:           "2021-06-25T19:07:33.155Z",
 			},
 		},
 	}
@@ -2331,13 +3109,14 @@ func SendInvitationTestHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/user_management/invitations" {
 		body, err = json.Marshal(
 			Invitation{
-				ID:        "invitation_123",
-				Email:     "marcelina@foo-corp.com",
-				State:     Pending,
-				Token:     "myToken",
-				ExpiresAt: "2021-06-25T19:07:33.155Z",
-				CreatedAt: "2021-06-25T19:07:33.155Z",
-				UpdatedAt: "2021-06-25T19:07:33.155Z",
+				ID:                  "invitation_123",
+				Email:               "marcelina@foo-corp.com",
+				State:               Pending,
+				Token:               "myToken",
+				AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+				ExpiresAt:           "2021-06-25T19:07:33.155Z",
+				CreatedAt:           "2021-06-25T19:07:33.155Z",
+				UpdatedAt:           "2021-06-25T19:07:33.155Z",
 			})
 	}
 
@@ -2371,13 +3150,14 @@ func TestRevokeInvitation(t *testing.T) {
 			},
 			expected: Invitation{
 
-				ID:        "invitation_123",
-				Email:     "marcelina@foo-corp.com",
-				State:     Pending,
-				Token:     "myToken",
-				ExpiresAt: "2021-06-25T19:07:33.155Z",
-				CreatedAt: "2021-06-25T19:07:33.155Z",
-				UpdatedAt: "2021-06-25T19:07:33.155Z",
+				ID:                  "invitation_123",
+				Email:               "marcelina@foo-corp.com",
+				State:               Pending,
+				Token:               "myToken",
+				AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+				ExpiresAt:           "2021-06-25T19:07:33.155Z",
+				CreatedAt:           "2021-06-25T19:07:33.155Z",
+				UpdatedAt:           "2021-06-25T19:07:33.155Z",
 			},
 		},
 	}
@@ -2415,13 +3195,14 @@ func RevokeInvitationTestHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/user_management/invitations/invitation_123/revoke" {
 		body, err = json.Marshal(
 			Invitation{
-				ID:        "invitation_123",
-				Email:     "marcelina@foo-corp.com",
-				State:     Pending,
-				Token:     "myToken",
-				ExpiresAt: "2021-06-25T19:07:33.155Z",
-				CreatedAt: "2021-06-25T19:07:33.155Z",
-				UpdatedAt: "2021-06-25T19:07:33.155Z",
+				ID:                  "invitation_123",
+				Email:               "marcelina@foo-corp.com",
+				State:               Pending,
+				Token:               "myToken",
+				AcceptInvitationUrl: "https://your-app.com/invite?invitation_token=myToken",
+				ExpiresAt:           "2021-06-25T19:07:33.155Z",
+				CreatedAt:           "2021-06-25T19:07:33.155Z",
+				UpdatedAt:           "2021-06-25T19:07:33.155Z",
 			})
 	}
 
